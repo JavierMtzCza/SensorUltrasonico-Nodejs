@@ -4,9 +4,10 @@ const { ReadlineParser } = require('@serialport/parser-readline')
 
 const app = express();
 
-let data =  [
+let base =  [
     {
         "ID":1,
+        //El estado representa 1-ocupado 0-libre
         "Estado":0,
     },
     {
@@ -26,13 +27,15 @@ let data =  [
         "Estado":0,
     },
 ]
-    app.get('/', (request, response) => {
-        response.send('hola');
-    })
+   
+app.get('/', (request, response) => {
+    response.send('hola');
+})
 
-    app.get('/api/data',(request,response) => {
-        response.json(data);
-    })
+//Obtener todos los datos de los sensores (usamos solo el 1)
+app.get('/api/data',(request,response) => {
+   response.json(base);
+})
 
 
 const PORT=3001;
@@ -59,12 +62,11 @@ const parser = port.pipe(new ReadlineParser({ delimiter: '~' }))
 //cada que se detecte una recepcion, lo imprimimos en la consola
 parser.on('data',(data)=>{
     const distancia = parseInt(data,10);
-    if(distancia<15 && distancia>10){
-        console.log('menor que 15 pero mayor de 10')
-        console.log(data[1])
-        data[0].ID=0;
-    }else if(distancia<10){
-        console.log('menor que 10')
-        data[0].ID=1;
+    if(distancia<15 && distancia>8){
+        console.log('Espacio libre')
+        base[0].Estado=0;
+    }else if(distancia<8){
+        console.log('Auto estacionado')
+        base[0].Estado=1;
     }   
 })
