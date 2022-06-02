@@ -1,0 +1,5 @@
+###
+GET http://localhost:3001/api/data HTTP/1.1
+
+###
+GET http://localhost:3001/ HTTP/1.1

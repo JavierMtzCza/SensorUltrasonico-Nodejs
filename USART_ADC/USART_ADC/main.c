@@ -1,14 +1,19 @@
-
 #define  F_CPU 16000000UL
 #include <avr/io.h>
 #include <util/delay.h>
 #include <string.h>
+#include <avr/interrupt.h>
 
 // DEFINICION FUNCIONES
 unsigned char USART_read(void);				// Recepción de caracteres
 void USART_write(unsigned char);			// Transmisión de caracteres
 void USART_msg(char*);						// Transmision de cadenas
 uint16_t ADC_read(uint8_t canal);			// Leer ADC en un canal especifico
+
+int pulso = 0;		// VALOR TIMER
+int i=0;		//MULTIPLEXOR
+int distancia = 0;		//DISTANCIA EN CM
+char muestra[10];		//DISTANCIA EN STRING
 
 
 int main(void){
@@ -22,30 +27,26 @@ int main(void){
 	UCSR0C = (0<<UMSEL01)|(0<<UMSEL00)|(0<<UPM01)|(0<<UPM00)|(0<<USBS0)|(1<<UCSZ01)|(1<<UCSZ00)|(0<<UCPOL0);
 	UBRR0 = 103;		//TRANSMISION 9600
 	
-	// CONFIGURACION DE ADC
-	ADMUX |= (1<<REFS0);
-	ADMUX &= ~(1<<REFS1);	// SELECCIONAMOS 5v
-	ADMUX &= ~(1<<ADLAR);	// AJUSTAMOSRESULTADO A LA DERECHA
+	//CONFIGURACION DE INTERRUPCION Y SENSOR ULTRASONICO
+	cli();		//Desactivamos interrupciones globales
+	DDRD= 0b11111011;		//Configuramos el puerto D como entrada(echo) y salida (trigger)
+	EICRA |= (1<<ISC00);		//Cuqluier cambio logico activa la interrupcion en int0
+	EICRA &= ~(1<<ISC01);
 	
-	ADCSRA |= (1<<ADPS0);	// PREESCALADOR A 128 
-	ADCSRA |= (1<<ADPS1);
-	ADCSRA |= (1<<ADPS2);
-	ADCSRA |= (1<<ADEN);	//SENAL DE ENCENDER ADC
-	
-	//USART_write_txt("Digite 1 para prender el led y 2 para apagarlo\n\r");
-	//uint8_t opcion = 0 ; 
-	
-	char dest[10];
-	uint16_t dato_adc;
-	float voltaje;
+	EIMSK |=(1<<INT0);		// Activamos interrupcion externa en int0
+	sei();		//Activamos interrupciones globales
 	
     while (1) {
-		dato_adc = ADC_read(0);
-		voltaje= (float) (5.0/1023)*dato_adc;
-		dtostrf(voltaje,5,1,dest);
-		strcat(dest,"~");
-		USART_write_txt(dest);
-		_delay_ms(500);
+		
+		PORTD |= (1<<PIND1);	//ponemos en alto para que mande un pulso sonico
+		_delay_us(10);
+		PORTD &= ~(1<<PIND1);	//volvemos a poner en 0
+		
+		distancia = pulso/900;		//leemos el ancho del pulso
+		itoa(distancia,muestra,10);
+		strcat(muestra,"~");
+		USART_write_txt(muestra);
+		_delay_ms(100);
 	}
 }
 
@@ -68,10 +69,26 @@ void USART_write_txt(char* cadena){
 	}
 }
 
-uint16_t ADC_read(uint8_t canal){
-	canal &= 0b00001111;	//limpiamos entrada a 5
-	ADMUX = (ADMUX & 0xF0) | canal;	// limpiamos los ultimos 4 bits de ADMUX
-	ADCSRA |= (1<<ADSC);	//Inicia la conversion
-	while ((ADCSRA)&(1<<ADSC));	// se termina hasta que complete la conversion
-	return(ADC);
+ISR(INT0_vect){
+	TCCR1A &= ~(1<<WGM10);
+	TCCR1A &= ~(1<<WGM11);
+	TCCR1B &= ~(1<<WGM12);
+	TCCR1B &= ~(1<<WGM13);		//modo de operacion normal de la interrupcion
+	
+	if(i==1){
+		pulso = TCNT1;		//registro que almacena el tiempo transcurrido por el timer
+		TCNT1=0x0000;		// se hace 0 para no acumular valores
+		i=0;
+	}
+	if(i==0){
+		TCNT1 = 0x0000;
+		
+		// cada 16ms el periodo es 32ms
+		TCCR1B |= (1<<CS10);
+		TCCR1B &= ~(1<<CS11);
+		TCCR1B &= ~(1<<CS12);
+		i=1;
+	}
+	
 }
+
