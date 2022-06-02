@@ -4,27 +4,13 @@ const { ReadlineParser } = require('@serialport/parser-readline')
 
 const app = express();
 
+
 let base =  [
     {
         "ID":1,
         //El estado representa 1-ocupado 0-libre
         "Estado":0,
-    },
-    {
-        "ID":2,
-        "Estado":0,
-    },
-    {
-        "ID":3,
-        "Estado":0,
-    },
-    {
-        "ID":4,
-        "Estado":0,
-    },
-    {
-        "ID":5,
-        "Estado":0,
+        "Apartado": false,
     },
 ]
    
@@ -62,11 +48,17 @@ const parser = port.pipe(new ReadlineParser({ delimiter: '~' }))
 //cada que se detecte una recepcion, lo imprimimos en la consola
 parser.on('data',(data)=>{
     const distancia = parseInt(data,10);
-    if(distancia<15 && distancia>8){
-        console.log('Espacio libre')
-        base[0].Estado=0;
-    }else if(distancia<8){
-        console.log('Auto estacionado')
+
+    if(base[0].Apartado){
+        console.log('Espacio apartado') 
         base[0].Estado=1;
-    }   
+    }else{
+        if(distancia<15 && distancia>8){
+            console.log('Espacio libre')
+            base[0].Estado=0;
+        }else if(distancia<8){
+            console.log('Auto estacionado')
+            base[0].Estado=1;
+        }  
+    } 
 })
